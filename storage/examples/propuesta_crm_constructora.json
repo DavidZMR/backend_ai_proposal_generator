@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "cliente": "Constructora Pedraza e Hijos",
+    "monto": "$195,000 MXN",
+    "duracion": "3 meses",
+    "tipo_proyecto": "CRM a la medida",
+    "stack": "React, Express, MongoDB"
+  },
+  "secciones": {
+    "resumen_ejecutivo": "Esta propuesta comprende el desarrollo de un Customer Relationship Management (CRM) personalizado para Constructora Pedraza e Hijos. El sistema permitirá centralizar la gestión de prospectos de ventas de desarrollos inmobiliarios, optimizando el seguimiento de cotizaciones y mejorando la tasa de conversión del equipo comercial.",
+    "alcance_funcional": "El CRM incluirá los siguientes módulos:\n\n1. Gestión de Contactos y Prospectos (Leads):\n- Captura centralizada de leads provenientes de redes sociales y sitio web.\n- Calificación de prospectos (frío, tibio, caliente).\n\n2. Pipeline de Ventas (Kanban):\n- Visualización interactiva de oportunidades por etapa (Contacto Inicial, Cita, Cotización, Negociación, Cierre).\n- Recordatorios automáticos para seguimiento de clientes.\n\n3. Reportes Gerenciales:\n- Dashboards de rendimiento por vendedor.\n- Reporte de tasas de conversión y proyecciones de ingresos.\n\n4. App Companion (PWA):\n- Versión móvil optimizada (Progressive Web App) para que los vendedores actualicen estados de citas desde el desarrollo inmobiliario en campo.",
+    "arquitectura": "- Interfaz de Usuario: React.js (Single Page Application) enfocada en rapidez y usabilidad.\n- API REST: Node.js con Express.\n- Base de Datos: MongoDB, elegida por su flexibilidad para manejar campos dinámicos en los perfiles de clientes y cotizaciones.\n- Autenticación: JWT (JSON Web Tokens) con control de roles (Administrador, Gerente de Ventas, Agente).",
+    "plan_sprints": "Ejecución en 5 sprints de 2 semanas:\n\n- Sprint 1 (Semanas 1-2): Toma de requerimientos, diseño de base de datos y maquetado de pantallas principales.\n- Sprint 2 (Semanas 3-4): Módulo de autenticación y gestión de usuarios/roles. CRUD de prospectos.\n- Sprint 3 (Semanas 5-6): Desarrollo del tablero Kanban (Pipeline de ventas) interactivo.\n- Sprint 4 (Semanas 7-8): Generación de reportes gráficos y desarrollo de la PWA móvil.\n- Sprint 5 (Semanas 9-10): QA, pruebas de usuario (UAT), migraciones de datos desde Excel y capacitación.",
+    "supuestos": "- El cliente proporcionará su catálogo actual de desarrollos y tipologías de departamentos para precargar en el sistema.\n- El equipo de ventas del cliente participará activamente durante el Sprint 5 para las pruebas UAT.\n- La infraestructura de despliegue será provista por LinkThinks en un entorno cloud estandarizado (DigitalOcean).",
+    "exclusiones": "- No incluye integración telefónica o centralita (PBX).\n- No incluye campañas de marketing digital o gestión de pauta.\n- Migración de datos históricos limitada a archivos Excel/CSV con formato predefinido.",
+    "inversion": "Costo de Desarrollo e Implementación:\n\n- Fase de Análisis y Diseño: $35,000 MXN\n- Fase de Desarrollo Core (CRM y Pipeline): $110,000 MXN\n- Fase de Reportes, PWA y Pruebas: $50,000 MXN\n\n**Inversión Total: $195,000 MXN** (Más IVA).\n\nSoporte y Mantenimiento Post-producción (Opcional):\n- Póliza de soporte mensual: $8,500 MXN (incluye hosting básico, respaldos y 10 hrs de soporte)."
+  }
+}

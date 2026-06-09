@@ -1,0 +1,9 @@
+{
+  "resumen_ejecutivo": "Escribe de 1 a 2 párrafos persuasivos resumiendo el objetivo del proyecto, el problema que resuelve y el valor que aportaremos al cliente. Mantén un tono formal y ejecutivo.",
+  "alcance_funcional": "Lista los módulos principales del sistema. Usa viñetas o listas numeradas. Sé específico sobre lo que hace cada módulo. Agrupa las funcionalidades lógicamente.",
+  "arquitectura": "Describe el stack tecnológico propuesto. Divide en Frontend, Backend, Base de Datos e Infraestructura si aplica. Explica brevemente por qué se eligen estas tecnologías.",
+  "plan_sprints": "Detalla la metodología de trabajo. Propón un número realista de sprints de 2 semanas. Lista los entregables clave por cada sprint. Usa viñetas de la forma 'Sprint X (Mes Y): Entregables...'",
+  "supuestos": "Lista de 3 a 5 condiciones necesarias para que el proyecto sea exitoso. (Ej. el cliente entregará assets, APIs disponibles, etc.). Inicia cada viñeta con un guion corto.",
+  "exclusiones": "Aclara explícitamente lo que NO está incluido para proteger el alcance del proyecto. (Ej. No incluye licencias de terceros, no incluye hardware). Inicia con guion corto.",
+  "inversion": "Presenta el costo total del proyecto en Pesos Mexicanos (MXN). Sugiere un desglose lógico por fases de desarrollo. Incluye una propuesta de plan de pagos (ej. 30%, 30%, 40%). Resalta el Total en negritas (**Total: $XXX,XXX MXN**)."
+}
