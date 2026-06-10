@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# STORAGE
+storage/sessions/*
+!storage/sessions/.gitkeep
+storage/generated/*
+!storage/generated/.gitkeep
+storage/chromadb/
