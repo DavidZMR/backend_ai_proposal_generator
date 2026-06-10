@@ -24,126 +24,173 @@ logger = logging.getLogger(__name__)
 
 TOOLS_SCHEMA = [
     {
-        "name": "extract_document_text",
-        "description": "Extrae todo el texto de un documento proporcionado por el usuario (PDF, DOCX, TXT). Úsalo para leer el brief o requerimientos.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "file_path": {
-                    "type": "string",
-                    "description": "Ruta absoluta o relativa al archivo a leer."
-                }
-            },
-            "required": ["file_path"]
+        "type": "function",
+        "function": {
+            "name": "extract_document_text",
+            "description": "Extrae todo el texto de un documento proporcionado por el usuario (PDF, DOCX, TXT). Úsalo para leer el brief o requerimientos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Ruta absoluta o relativa al archivo a leer."
+                    }
+                },
+                "required": ["file_path"]
+            }
         }
     },
     {
-        "name": "transcribe_audio",
-        "description": "Transcribe un archivo de audio (mp3, wav, mp4) a texto. Úsalo cuando el usuario proporciona un audio con la minuta o requerimientos.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "audio_path": {
-                    "type": "string",
-                    "description": "Ruta absoluta o relativa al archivo de audio."
-                }
-            },
-            "required": ["audio_path"]
+        "type": "function",
+        "function": {
+            "name": "transcribe_audio",
+            "description": "Transcribe un archivo de audio (mp3, wav, mp4) a texto. Úsalo cuando el usuario proporciona un audio con la minuta o requerimientos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "audio_path": {
+                        "type": "string",
+                        "description": "Ruta absoluta o relativa al archivo de audio."
+                    }
+                },
+                "required": ["audio_path"]
+            }
         }
     },
     {
-        "name": "search_proposal_examples",
-        "description": "Busca en la base de datos de conocimiento propuestas comerciales históricas similares para usarlas como referencia de estilo, formato o montos.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "topic": {
-                    "type": "string",
-                    "description": "Tema o palabras clave de búsqueda (ej. 'app móvil', 'ecommerce inmobiliario')."
+        "type": "function",
+        "function": {
+            "name": "search_proposal_examples",
+            "description": "Busca en la base de datos de conocimiento propuestas comerciales históricas similares para usarlas como referencia de estilo, formato o montos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "Tema o palabras clave de búsqueda (ej. 'app móvil', 'ecommerce inmobiliario')."
+                    },
+                    "num_results": {
+                        "type": "integer",
+                        "description": "Número de ejemplos a retornar (recomendado: 2)."
+                    }
                 },
-                "num_results": {
-                    "type": "integer",
-                    "description": "Número de ejemplos a retornar (recomendado: 2)."
-                }
-            },
-            "required": ["topic"]
+                "required": ["topic"]
+            }
         }
     },
     {
-        "name": "get_template_section",
-        "description": "Obtiene las instrucciones y guías específicas de cómo debe redactarse una sección particular de la propuesta.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "section_name": {
-                    "type": "string",
-                    "description": "Nombre de la sección (ej. 'resumen_ejecutivo', 'alcance_funcional', 'arquitectura', 'plan_sprints', 'supuestos', 'exclusiones', 'inversion')."
-                }
-            },
-            "required": ["section_name"]
+        "type": "function",
+        "function": {
+            "name": "get_template_section",
+            "description": "Obtiene las instrucciones y guías específicas de cómo debe redactarse una sección particular de la propuesta.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "section_name": {
+                        "type": "string",
+                        "description": "Nombre de la sección (ej. 'resumen_ejecutivo', 'alcance_funcional', 'arquitectura', 'plan_sprints', 'supuestos', 'exclusiones', 'inversion')."
+                    }
+                },
+                "required": ["section_name"]
+            }
         }
     },
     {
-        "name": "submit_section_content",
-        "description": "Envía el contenido final generado para una sección específica. DEBES usar esta herramienta para guardar tu progreso de redacción.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "section_name": {
-                    "type": "string",
-                    "description": "El nombre de la sección que estás entregando."
+        "type": "function",
+        "function": {
+            "name": "submit_section_content",
+            "description": "Envía el contenido final generado para una sección específica. DEBES usar esta herramienta para guardar tu progreso de redacción.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "section_name": {
+                        "type": "string",
+                        "description": "El nombre de la sección que estás entregando."
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "El texto completo redactado y formateado para esta sección."
+                    }
                 },
-                "content": {
-                    "type": "string",
-                    "description": "El texto completo redactado y formateado para esta sección."
-                }
-            },
-            "required": ["section_name", "content"]
+                "required": ["section_name", "content"]
+            }
         }
     },
     {
-        "name": "save_metadata",
-        "description": "Guarda los metadatos estimados del proyecto (monto, duración, tipo). DEBES llamar a esta herramienta al inicio para registrar estas estimaciones.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "amount": {
-                    "type": "string",
-                    "description": "Monto estimado en formato de texto (ej. '$250,000 MXN', 'Por definir')."
+        "type": "function",
+        "function": {
+            "name": "save_metadata",
+            "description": "Guarda los metadatos estimados del proyecto (monto, duración, tipo). DEBES llamar a esta herramienta al inicio para registrar estas estimaciones.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "amount": {
+                        "type": "string",
+                        "description": "Monto estimado en formato de texto (ej. '$250,000 MXN', 'Por definir')."
+                    },
+                    "duration": {
+                        "type": "string",
+                        "description": "Duración estimada (ej. '3 meses', '2 semanas')."
+                    },
+                    "project_type": {
+                        "type": "string",
+                        "description": "Tipo de proyecto (ej. 'App Móvil', 'E-commerce', 'Desarrollo a Medida')."
+                    },
+                    "solution_type": {
+                        "type": "string",
+                        "description": "Clasificación explícita de la solución propuesta (ej. 'App Móvil', 'Página Web', 'E-commerce', 'CRM', 'Plataforma SaaS', 'API/Backend', 'Sistema ERP', 'Otro')."
+                    },
+                    "tech_stack": {
+                        "type": "string",
+                        "description": "Stack tecnológico principal propuesto para el proyecto (ej. 'React Native, Node.js, PostgreSQL')."
+                    }
                 },
-                "duration": {
-                    "type": "string",
-                    "description": "Duración estimada (ej. '3 meses', '2 semanas')."
-                },
-                "project_type": {
-                    "type": "string",
-                    "description": "Tipo de proyecto (ej. 'App Móvil', 'E-commerce', 'Desarrollo a Medida')."
-                }
-            },
-            "required": ["amount", "duration", "project_type"]
+                "required": ["amount", "duration", "project_type", "solution_type", "tech_stack"]
+            }
         }
     },
     {
-        "name": "assemble_and_export",
-        "description": "Ensambla todas las secciones generadas y exporta la propuesta a formatos DOCX y PDF. Llama a esta herramienta SOLO cuando hayas terminado todas las secciones.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "sections": {
-                    "type": "object",
-                    "description": "Diccionario clave-valor donde la clave es el nombre de la sección y el valor es el contenido final generado.",
-                    "additionalProperties": {"type": "string"}
+        "type": "function",
+        "function": {
+            "name": "assemble_and_export",
+            "description": "Ensambla todas las secciones generadas y exporta la propuesta a formatos DOCX y PDF. Llama a esta herramienta SOLO cuando hayas terminado todas las secciones.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sections": {
+                        "type": "object",
+                        "description": "Diccionario clave-valor donde la clave es el nombre de la sección y el valor es el contenido final generado.",
+                        "additionalProperties": {"type": "string"}
+                    },
+                    "prospect_name": {
+                        "type": "string",
+                        "description": "Nombre del cliente o prospecto."
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Directorio donde se guardarán los archivos generados."
+                    }
                 },
-                "prospect_name": {
-                    "type": "string",
-                    "description": "Nombre del cliente o prospecto."
+                "required": ["sections", "prospect_name", "output_dir"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_budget",
+            "description": "Calcula de forma matemáticamente exacta el presupuesto de un proyecto basado en las horas estimadas de los perfiles tecnológicos necesarios. Llama a esta herramienta cuando redactes la sección 'inversion'. NO inventes precios por tu cuenta.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "hours_frontend": { "type": "integer", "description": "Horas estimadas de desarrollo Frontend." },
+                    "hours_backend": { "type": "integer", "description": "Horas estimadas de desarrollo Backend." },
+                    "hours_design": { "type": "integer", "description": "Horas estimadas de Diseño UI/UX." },
+                    "hours_pm": { "type": "integer", "description": "Horas estimadas de Project Management." },
+                    "hours_qa": { "type": "integer", "description": "Horas estimadas de QA / Testing." }
                 },
-                "output_dir": {
-                    "type": "string",
-                    "description": "Directorio donde se guardarán los archivos generados."
-                }
-            },
-            "required": ["sections", "prospect_name", "output_dir"]
+                "required": ["hours_frontend", "hours_backend", "hours_design", "hours_pm", "hours_qa"]
+            }
         }
     }
 ]
@@ -206,7 +253,7 @@ def tool_submit_section_content(section_name: str, content: str) -> str:
     """
     return f"Contenido de la sección '{section_name}' guardado exitosamente."
 
-def tool_save_metadata(amount: str, duration: str, project_type: str) -> str:
+def tool_save_metadata(amount: str, duration: str, project_type: str, solution_type: str = None, tech_stack: str = None) -> str:
     """
     Mock function interceptada por el orquestador.
     """
@@ -237,6 +284,44 @@ def tool_assemble_and_export(sections: dict, prospect_name: str, output_dir: str
     except Exception as e:
         return f"Error al ensamblar/exportar: {e}"
 
+def tool_calculate_budget(hours_frontend: int, hours_backend: int, hours_design: int, hours_pm: int, hours_qa: int) -> str:
+    """Calcula el presupuesto leyendo las tarifas base desde Supabase y retorna un markdown."""
+    try:
+        from utils.supabase_client import get_supabase_client
+        db = get_supabase_client()
+        res = db.table("settings").select("value").eq("key", "pricing_rates").execute()
+        rates = {"frontend": 600, "backend": 700, "design": 500, "pm": 600, "qa": 400}
+        if res.data:
+            rates = res.data[0]["value"]
+            
+        cost_fe = hours_frontend * rates.get("frontend", 600)
+        cost_be = hours_backend * rates.get("backend", 700)
+        cost_ux = hours_design * rates.get("design", 500)
+        cost_pm = hours_pm * rates.get("pm", 600)
+        cost_qa = hours_qa * rates.get("qa", 400)
+        
+        subtotal = cost_fe + cost_be + cost_ux + cost_pm + cost_qa
+        iva = subtotal * 0.16
+        total = subtotal + iva
+        
+        table = "### Desglose de Inversión\n\n"
+        table += "| Perfil / Actividad | Horas | Tarifa/Hr (MXN) | Costo (MXN) |\n"
+        table += "|---|---|---|---|\n"
+        if hours_frontend > 0: table += f"| Desarrollo Frontend | {hours_frontend} | ${rates.get('frontend', 600)} | ${cost_fe:,.2f} |\n"
+        if hours_backend > 0: table += f"| Desarrollo Backend | {hours_backend} | ${rates.get('backend', 700)} | ${cost_be:,.2f} |\n"
+        if hours_design > 0: table += f"| Diseño UI/UX | {hours_design} | ${rates.get('design', 500)} | ${cost_ux:,.2f} |\n"
+        if hours_pm > 0: table += f"| Project Management | {hours_pm} | ${rates.get('pm', 600)} | ${cost_pm:,.2f} |\n"
+        if hours_qa > 0: table += f"| QA / Pruebas | {hours_qa} | ${rates.get('qa', 400)} | ${cost_qa:,.2f} |\n"
+        
+        table += "\n"
+        table += f"**Subtotal:** ${subtotal:,.2f} MXN\n\n"
+        table += f"**IVA (16%):** ${iva:,.2f} MXN\n\n"
+        table += f"**Inversión Total:** ${total:,.2f} MXN\n\n"
+        table += "*Nota: Estimación basada en esfuerzo nominal de Sprints planificados.*"
+        
+        return table
+    except Exception as e:
+        return f"Error calculando presupuesto: {e}"
 
 # ==========================================
 # 3. DISPATCHER
@@ -249,7 +334,8 @@ TOOL_MAP = {
     "get_template_section": tool_get_template_section,
     "save_metadata": tool_save_metadata,
     "submit_section_content": tool_submit_section_content,
-    "assemble_and_export": tool_assemble_and_export
+    "assemble_and_export": tool_assemble_and_export,
+    "calculate_budget": tool_calculate_budget
 }
 
 def execute_tool(tool_name: str, tool_args: dict) -> Any:
