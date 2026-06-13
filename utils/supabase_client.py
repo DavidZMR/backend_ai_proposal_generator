@@ -86,12 +86,19 @@ def upload_file(bucket: str, file_path: str, destination_name: str) -> str:
     try:
         client = get_supabase_client()
         with open(file_path, "rb") as f:
-            # Usar file_options upsert para evitar error si se reintenta
-            client.storage.from_(bucket).upload(
-                path=destination_name,
-                file=f,
-                file_options={"upsert": "true"}
-            )
+            file_data = f.read()
+            
+        content_type = "application/octet-stream"
+        if file_path.endswith(".pdf"):
+            content_type = "application/pdf"
+        elif file_path.endswith(".docx"):
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            
+        client.storage.from_(bucket).upload(
+            path=destination_name,
+            file=file_data,
+            file_options={"upsert": "true", "content-type": content_type}
+        )
         return get_file_url(bucket, destination_name)
     except Exception as e:
         logger.error(f"Error subiendo archivo {file_path} al bucket {bucket}: {e}")

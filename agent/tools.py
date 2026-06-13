@@ -68,10 +68,6 @@ TOOLS_SCHEMA = [
                     "topic": {
                         "type": "string",
                         "description": "Tema o palabras clave de búsqueda (ej. 'app móvil', 'ecommerce inmobiliario')."
-                    },
-                    "num_results": {
-                        "type": "integer",
-                        "description": "Número de ejemplos a retornar (recomendado: 2)."
                     }
                 },
                 "required": ["topic"]
@@ -157,21 +153,12 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "sections": {
-                        "type": "object",
-                        "description": "Diccionario clave-valor donde la clave es el nombre de la sección y el valor es el contenido final generado.",
-                        "additionalProperties": {"type": "string"}
-                    },
                     "prospect_name": {
                         "type": "string",
                         "description": "Nombre del cliente o prospecto."
-                    },
-                    "output_dir": {
-                        "type": "string",
-                        "description": "Directorio donde se guardarán los archivos generados."
                     }
                 },
-                "required": ["sections", "prospect_name", "output_dir"]
+                "required": ["prospect_name"]
             }
         }
     },
@@ -183,11 +170,11 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "hours_frontend": { "type": "integer", "description": "Horas estimadas de desarrollo Frontend." },
-                    "hours_backend": { "type": "integer", "description": "Horas estimadas de desarrollo Backend." },
-                    "hours_design": { "type": "integer", "description": "Horas estimadas de Diseño UI/UX." },
-                    "hours_pm": { "type": "integer", "description": "Horas estimadas de Project Management." },
-                    "hours_qa": { "type": "integer", "description": "Horas estimadas de QA / Testing." }
+                    "hours_frontend": { "type": "string", "description": "Horas estimadas de desarrollo Frontend. (ej. '120')" },
+                    "hours_backend": { "type": "string", "description": "Horas estimadas de desarrollo Backend. (ej. '80')" },
+                    "hours_design": { "type": "string", "description": "Horas estimadas de Diseño UI/UX. (ej. '40')" },
+                    "hours_pm": { "type": "string", "description": "Horas estimadas de Project Management. (ej. '20')" },
+                    "hours_qa": { "type": "string", "description": "Horas estimadas de QA / Testing. (ej. '40')" }
                 },
                 "required": ["hours_frontend", "hours_backend", "hours_design", "hours_pm", "hours_qa"]
             }
@@ -202,7 +189,11 @@ TOOLS_SCHEMA = [
 
 def tool_extract_document_text(file_path: str) -> str:
     try:
-        return extract_text_from_file(file_path)
+        doc_text = extract_text_from_file(file_path)
+        # TRUNCATE to avoid hitting Groq's 15k TPM limit when 4+ docs are uploaded
+        if len(doc_text) > 4500:
+            doc_text = doc_text[:4500] + "\n...[RESTO DEL DOCUMENTO TRUNCADO POR LÍMITE DE TOKENS. INFIERE EL RESTO.]"
+        return doc_text
     except Exception as e:
         return f"Error al leer el documento: {e}"
 
@@ -212,7 +203,7 @@ def tool_transcribe_audio(audio_path: str) -> str:
     except Exception as e:
         return f"Error al transcribir el audio: {e}"
 
-def tool_search_proposal_examples(topic: str, num_results: int = 2) -> str:
+def tool_search_proposal_examples(topic: str, num_results: int = 1) -> str:
     try:
         results = search_similar(topic, n_results=num_results)
         if not results:
@@ -223,6 +214,9 @@ def tool_search_proposal_examples(topic: str, num_results: int = 2) -> str:
             meta = res.get("metadata", {})
             cliente = meta.get("cliente", "Desconocido")
             doc = res.get("document", "")
+            # TRUNCATE to avoid hitting Groq's 6000 TPM limit
+            if len(doc) > 4500:
+                doc = doc[:4500] + "\n...[TRUNCADO POR LÍMITE DE TOKENS]"
             output.append(f"--- EJEMPLO {i+1}: Cliente {cliente} ---\n{doc}\n")
             
         return "\n".join(output)
@@ -284,9 +278,14 @@ def tool_assemble_and_export(sections: dict, prospect_name: str, output_dir: str
     except Exception as e:
         return f"Error al ensamblar/exportar: {e}"
 
-def tool_calculate_budget(hours_frontend: int, hours_backend: int, hours_design: int, hours_pm: int, hours_qa: int) -> str:
+def tool_calculate_budget(hours_frontend, hours_backend, hours_design, hours_pm, hours_qa, proposal_id=None) -> str:
     """Calcula el presupuesto leyendo las tarifas base desde Supabase y retorna un markdown."""
     try:
+        hours_frontend = int(hours_frontend)
+        hours_backend = int(hours_backend)
+        hours_design = int(hours_design)
+        hours_pm = int(hours_pm)
+        hours_qa = int(hours_qa)
         from utils.supabase_client import get_supabase_client
         db = get_supabase_client()
         res = db.table("settings").select("value").eq("key", "pricing_rates").execute()
@@ -304,8 +303,10 @@ def tool_calculate_budget(hours_frontend: int, hours_backend: int, hours_design:
         iva = subtotal * 0.16
         total = subtotal + iva
         
-        table = "### Desglose de Inversión\n\n"
-        table += "| Perfil / Actividad | Horas | Tarifa/Hr (MXN) | Costo (MXN) |\n"
+        if proposal_id:
+            db.table("proposals").update({"amount": f"${total:,.2f} MXN"}).eq("id", proposal_id).execute()
+        
+        table = "| Perfil / Actividad | Horas | Tarifa/Hr (MXN) | Costo (MXN) |\n"
         table += "|---|---|---|---|\n"
         if hours_frontend > 0: table += f"| Desarrollo Frontend | {hours_frontend} | ${rates.get('frontend', 600)} | ${cost_fe:,.2f} |\n"
         if hours_backend > 0: table += f"| Desarrollo Backend | {hours_backend} | ${rates.get('backend', 700)} | ${cost_be:,.2f} |\n"

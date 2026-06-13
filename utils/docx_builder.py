@@ -75,21 +75,49 @@ def build_docx(sections: dict, prospect_name: str, output_path: str) -> str:
             
             content = sections[key]
             
-            # Procesamiento simple de párrafos y listas
+            # Procesamiento simple de párrafos, listas y TABLAS
+            in_table = False
+            current_table = None
+            
             for line in content.split("\n"):
                 line = line.strip()
                 if not line:
+                    in_table = False
                     continue
                 
-                if line.startswith("- ") or line.startswith("* "):
-                    p = doc.add_paragraph(line[2:].strip(), style='List Bullet')
-                elif line.startswith("#"):
-                    # Soporte básico para subheadings
-                    clean_line = line.lstrip("#").strip()
-                    p = doc.add_heading(clean_line, level=2)
-                    p.runs[0].font.color.rgb = RGBColor(*NAVY_HEX)
+                if line.startswith("|") and line.endswith("|"):
+                    if not in_table:
+                        in_table = True
+                        current_table = doc.add_table(rows=0, cols=0)
+                        current_table.style = 'Table Grid'
+                    
+                    # Remove edge pipes and split
+                    cells = [c.strip() for c in line.strip('|').split('|')]
+                    
+                    # Skip markdown separator line like |---|---|
+                    if all(c.replace("-", "").strip() == "" for c in cells):
+                        continue
+                    
+                    # Ensure table has enough columns
+                    if len(current_table.columns) == 0:
+                        for _ in cells:
+                            current_table.add_column(Inches(1.2))
+                            
+                    row_cells = current_table.add_row().cells
+                    for idx, cell_text in enumerate(cells):
+                        if idx < len(row_cells):
+                            row_cells[idx].text = cell_text
                 else:
-                    p = doc.add_paragraph(line)
+                    in_table = False
+                    if line.startswith("- ") or line.startswith("* "):
+                        p = doc.add_paragraph(line[2:].strip(), style='List Bullet')
+                    elif line.startswith("#"):
+                        # Soporte básico para subheadings
+                        clean_line = line.lstrip("#").strip()
+                        p = doc.add_heading(clean_line, level=2)
+                        p.runs[0].font.color.rgb = RGBColor(*NAVY_HEX)
+                    else:
+                        p = doc.add_paragraph(line)
                     
             doc.add_page_break()
             

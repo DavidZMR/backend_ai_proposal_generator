@@ -125,6 +125,7 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
         max_iterations = 30
         iterations = 0
         has_searched_rag = False
+        total_tokens_used = 0
         
         # 2. Agent Loop
         while iterations < max_iterations:
@@ -132,14 +133,20 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
             logger.info(f"Agent Loop Iteration {iterations}")
             
             response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile", 
+                model="meta-llama/llama-4-scout-17b-16e-instruct", 
                 messages=messages,
                 tools=TOOLS_SCHEMA,
                 tool_choice="auto",
-                max_tokens=4096
+                max_tokens=1500
             )
             
+            tokens_in_iteration = response.usage.total_tokens if hasattr(response, 'usage') and response.usage else 0
+            total_tokens_used += tokens_in_iteration
+            logger.info(f"Tokens en esta iteración: {tokens_in_iteration} | Tokens TOTALES consumidos hasta ahora: {total_tokens_used}")
+            
             response_message = response.choices[0].message
+            
+
             # Append the message to the conversation
             messages.append(response_message)
             
@@ -170,6 +177,32 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                         sec_name = tool_args.get("section_name")
                         sec_content = tool_args.get("content")
                         if sec_name and sec_content:
+                            # --- POST-PROCESSING: Eliminar título redundante ---
+                            lines = sec_content.strip().split("\n")
+                            if lines:
+                                first_line_clean = lines[0].replace("#", "").replace("*", "").strip().lower()
+                                
+                                # Mapeo exacto de los nombres de sección a español
+                                section_titles_map = {
+                                    "resumen_ejecutivo": "resumen ejecutivo",
+                                    "alcance_funcional": "alcance funcional",
+                                    "arquitectura": "arquitectura",
+                                    "plan_sprints": "plan de sprints",
+                                    "supuestos": "supuestos",
+                                    "exclusiones": "exclusiones",
+                                    "inversion": "inversión"
+                                }
+                                expected_title = section_titles_map.get(sec_name, sec_name.replace('_', ' ')).lower()
+                                
+                                # Quitar el acento en inversion para la comparación por si acaso
+                                if "inversion" in expected_title or "inversión" in expected_title:
+                                    first_line_clean = first_line_clean.replace("ó", "o")
+                                    expected_title = expected_title.replace("ó", "o")
+                                    
+                                # Si la primera línea contiene el nombre de la sección y es corta (es un título)
+                                if expected_title in first_line_clean and len(first_line_clean) < len(expected_title) + 15:
+                                    sec_content = "\n".join(lines[1:]).strip()
+                            
                             generated_sections[sec_name] = sec_content
                             if sec_name not in sections_completed:
                                 sections_completed.append(sec_name)
@@ -184,6 +217,7 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                             
                             logger.info(f"Sección '{sec_name}' guardada en DB ({len(sections_completed)}/{len(sections_to_generate)})")
                             append_timeline_event(proposal_id, "Sección completada", f"Se ha generado la sección: {sec_name}")
+                            
                             
                     # --- MANEJO ESPECIAL: Metadatos ---
                     elif tool_name == "save_metadata":
@@ -222,6 +256,8 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
 
                     # Ejecutar la tool de Python real
                     try:
+                        if tool_name == "calculate_budget":
+                            tool_args["proposal_id"] = proposal_id
                         result_data = execute_tool(tool_name, tool_args)
                         append_decision_log(
                             proposal_id, iterations, "tool_call", tool_name, 
@@ -306,6 +342,29 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                             
                             append_timeline_event(proposal_id, "Propuesta lista", "La propuesta comercial ha sido finalizada y guardada en borrador.")
                             logger.info(f"Proceso completado con éxito para propuesta {proposal_id}")
+                            
+                            # --- NUEVO: Auto-Alimentar el RAG ---
+                            try:
+                                proposal_json = {
+                                    "metadata": {
+                                        "cliente": prospect_name,
+                                        "tipo_proyecto": "Propuesta Generada" # Se podría extraer del contexto
+                                    },
+                                    "secciones": generated_sections
+                                }
+                                examples_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "examples")
+                                os.makedirs(examples_dir, exist_ok=True)
+                                json_path = os.path.join(examples_dir, f"{proposal_id}.json")
+                                
+                                with open(json_path, "w", encoding="utf-8") as f:
+                                    json.dump(proposal_json, f, indent=2, ensure_ascii=False)
+                                
+                                from utils.rag_setup import index_proposal
+                                index_proposal(json_path, proposal_id)
+                                logger.info(f"Propuesta {proposal_id} auto-indexada en el RAG para futuros matches.")
+                            except Exception as rag_err:
+                                logger.warning(f"Error auto-indexando en RAG: {rag_err}")
+
                             return # Termina el loop del orquestador
                         
                     # Devolver el resultado a Llama 3 para que siga pensando
@@ -389,7 +448,7 @@ FEEDBACK DEL COMERCIAL:
 {feedback}
 """
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=2048
         )

@@ -9,7 +9,7 @@ import os
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
 from reportlab.pdfgen import canvas
 
 # Colores LinkThinks
@@ -135,22 +135,60 @@ def convert_sections_to_pdf(sections: dict, prospect_name: str, output_path: str
             
             content = sections[key]
             
+            table_data = []
+            
+            def flush_table():
+                if table_data:
+                    # Ancho sugerido: distribuimos el ancho de la página entre las columnas
+                    avail_width = letter[0] - 144 # 72 left + 72 right margin
+                    col_widths = [avail_width / max(1, len(table_data[0]))] * max(1, len(table_data[0]))
+                    
+                    t = Table(table_data, colWidths=col_widths)
+                    t.setStyle(TableStyle([
+                        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F9FAFB")),
+                        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor("#374151")),
+                        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                        ('BOTTOMPADDING', (0,0), (-1,0), 10),
+                        ('TOPPADDING', (0,0), (-1,0), 10),
+                        ('BACKGROUND', (0,1), (-1,-1), colors.white),
+                        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E5E7EB")),
+                        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                    ]))
+                    story.append(t)
+                    story.append(Spacer(1, 12))
+                    table_data.clear()
+
             for line in content.split("\n"):
                 line = line.strip()
                 if not line:
+                    flush_table()
                     continue
                 
                 # Escapar caracteres HTML reservados por ReportLab
                 line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 
-                if line.startswith("- ") or line.startswith("* "):
-                    story.append(Paragraph(f"• {line[2:].strip()}", bullet_style))
-                elif line.startswith("## "):
-                    story.append(Paragraph(line[3:].strip(), subheading_style))
-                elif line.startswith("# "):
-                    story.append(Paragraph(line[2:].strip(), subheading_style))
+                if line.startswith("|") and line.endswith("|"):
+                    cells = [c.strip() for c in line.strip('|').split('|')]
+                    if all(c.replace("-", "").strip() == "" for c in cells):
+                        continue
+                        
+                    # Para la fila de encabezado (primera de table_data), usaremos una fuente normal_style ligeramente modificada no es necesaria si TableStyle ya aplica Bold,
+                    # pero envolver en Paragraph permite que el texto haga salto de línea si es muy largo.
+                    row_elements = [Paragraph(c, normal_style) for c in cells]
+                    table_data.append(row_elements)
                 else:
-                    story.append(Paragraph(line, normal_style))
+                    flush_table()
+                    if line.startswith("- ") or line.startswith("* "):
+                        story.append(Paragraph(f"• {line[2:].strip()}", bullet_style))
+                    elif line.startswith("## "):
+                        story.append(Paragraph(line[3:].strip(), subheading_style))
+                    elif line.startswith("# "):
+                        story.append(Paragraph(line[2:].strip(), subheading_style))
+                    else:
+                        story.append(Paragraph(line, normal_style))
+            
+            flush_table()
                     
             story.append(Spacer(1, 14))
             # Opcional: Separar secciones grandes por página
