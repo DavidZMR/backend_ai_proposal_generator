@@ -174,9 +174,10 @@ TOOLS_SCHEMA = [
                     "hours_backend": { "type": "string", "description": "Horas estimadas de desarrollo Backend. (ej. '80')" },
                     "hours_design": { "type": "string", "description": "Horas estimadas de Diseño UI/UX. (ej. '40')" },
                     "hours_pm": { "type": "string", "description": "Horas estimadas de Project Management. (ej. '20')" },
-                    "hours_qa": { "type": "string", "description": "Horas estimadas de QA / Testing. (ej. '40')" }
+                    "hours_qa": { "type": "string", "description": "Horas estimadas de QA / Testing. (ej. '40')" },
+                    "total_weeks": { "type": "integer", "description": "Suma total de la duración en semanas de todos los sprints planificados en 'plan_sprints'." }
                 },
-                "required": ["hours_frontend", "hours_backend", "hours_design", "hours_pm", "hours_qa"]
+                "required": ["hours_frontend", "hours_backend", "hours_design", "hours_pm", "hours_qa", "total_weeks"]
             }
         }
     }
@@ -278,7 +279,7 @@ def tool_assemble_and_export(sections: dict, prospect_name: str, output_dir: str
     except Exception as e:
         return f"Error al ensamblar/exportar: {e}"
 
-def tool_calculate_budget(hours_frontend, hours_backend, hours_design, hours_pm, hours_qa, proposal_id=None) -> str:
+def tool_calculate_budget(hours_frontend, hours_backend, hours_design, hours_pm, hours_qa, total_weeks=None, proposal_id=None) -> str:
     """Calcula el presupuesto leyendo las tarifas base desde Supabase y retorna un markdown."""
     try:
         hours_frontend = int(hours_frontend)
@@ -304,7 +305,10 @@ def tool_calculate_budget(hours_frontend, hours_backend, hours_design, hours_pm,
         total = subtotal + iva
         
         if proposal_id:
-            db.table("proposals").update({"amount": f"${total:,.2f} MXN"}).eq("id", proposal_id).execute()
+            update_data = {"amount": f"${total:,.2f} MXN"}
+            if total_weeks:
+                update_data["duration"] = f"{total_weeks} semanas"
+            db.table("proposals").update(update_data).eq("id", proposal_id).execute()
         
         table = "| Perfil / Actividad | Horas | Tarifa/Hr (MXN) | Costo (MXN) |\n"
         table += "|---|---|---|---|\n"

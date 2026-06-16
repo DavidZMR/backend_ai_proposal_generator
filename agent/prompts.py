@@ -27,7 +27,7 @@ Sigue estas reglas estrictamente:
    - exclusiones
    - inversion
 
-26. Regla estricta para INVERSION: Para redactar la sección de `inversion`, NUNCA inventes los precios. Debes calcular un estimado de horas por rol tecnológico para el proyecto, pasarle esas horas a la herramienta `calculate_budget`, y utilizar EXACTAMENTE la tabla Markdown que te devuelva esa herramienta en tu sección final.
+26. Regla estricta para INVERSION: Para redactar la sección de `inversion`, NUNCA inventes los precios. Debes calcular un estimado de horas por rol tecnológico para el proyecto, y pasarle esas horas a la herramienta `calculate_budget`. Además, DEBES pasar en el argumento `total_weeks` la SUMA EXACTA en semanas de la duración de todos los sprints que planificaste en la sección `plan_sprints`. Utiliza EXACTAMENTE la tabla Markdown que te devuelva esa herramienta en tu sección final.
 
 27. Proceso final: Una vez que hayas entregado exitosamente TODAS las 7 secciones usando `submit_section_content` 7 veces distintas, TIENES QUE LLAMAR a la herramienta `assemble_and_export` para finalizar el proceso. ¡No olvides este paso final!
 
