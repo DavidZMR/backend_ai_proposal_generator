@@ -9,7 +9,7 @@ import os
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, Image as RLImage
 from reportlab.pdfgen import canvas
 
 # Colores LinkThinks
@@ -113,21 +113,38 @@ def convert_sections_to_pdf(sections: dict, prospect_name: str, output_path: str
     story = []
     
     # 1. Portada
-    story.append(Spacer(1, 200)) # Centrar verticalmente
+    story.append(Spacer(1, 60)) # Centrar verticalmente (ajustado para la imagen más grande)
+    
+    logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "assets", "cover_image.png")
+    if os.path.exists(logo_path):
+        story.append(RLImage(logo_path, width=400, height=225, kind='proportional'))
+        story.append(Spacer(1, 40))
+        
     story.append(Paragraph("Propuesta de Servicios", title_style))
     story.append(Paragraph(f"Para: {prospect_name}", subtitle_style))
     story.append(PageBreak())
     
-    # 2. Secciones
+    # 1.5 Índice
+    story.append(Paragraph("Índice", heading_style))
+    
     order = [
         ("Resumen Ejecutivo", "resumen_ejecutivo"),
         ("Alcance Funcional", "alcance_funcional"),
         ("Arquitectura Propuesta", "arquitectura"),
+        ("Metodología", "metodologia"),
         ("Plan de Sprints", "plan_sprints"),
         ("Supuestos", "supuestos"),
         ("Exclusiones", "exclusiones"),
         ("Inversión", "inversion"),
     ]
+    
+    for title_text, key in order:
+        if key in sections and sections[key]:
+            story.append(Paragraph(f"• {title_text}", bullet_style))
+            
+    story.append(PageBreak())
+    
+
     
     for title_text, key in order:
         if key in sections and sections[key]:
@@ -165,8 +182,12 @@ def convert_sections_to_pdf(sections: dict, prospect_name: str, output_path: str
                     flush_table()
                     continue
                 
+                import re
                 # Escapar caracteres HTML reservados por ReportLab
                 line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                
+                # Procesar negritas Markdown: **texto** a <b>texto</b>
+                line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
                 
                 if line.startswith("|") and line.endswith("|"):
                     cells = [c.strip() for c in line.strip('|').split('|')]
@@ -179,8 +200,12 @@ def convert_sections_to_pdf(sections: dict, prospect_name: str, output_path: str
                     table_data.append(row_elements)
                 else:
                     flush_table()
-                    if line.startswith("- ") or line.startswith("* "):
-                        story.append(Paragraph(f"• {line[2:].strip()}", bullet_style))
+                    if line.startswith("- ") or line.startswith("* ") or line.startswith("• "):
+                        # Eliminar posibles asteriscos residuales de negritas mal formateadas en viñetas
+                        clean_text = line[2:].strip().replace('**', '')
+                        story.append(Paragraph(f"• {clean_text}", bullet_style))
+                    elif line.startswith("### "):
+                        story.append(Paragraph(line[4:].strip(), subheading_style))
                     elif line.startswith("## "):
                         story.append(Paragraph(line[3:].strip(), subheading_style))
                     elif line.startswith("# "):

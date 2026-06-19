@@ -77,6 +77,29 @@ def index_proposal(file_path: str, proposal_id: str):
     )
     logger.info(f"Propuesta indexada en RAG: {proposal_id}")
 
+def delete_from_rag(proposal_id: str):
+    """
+    Elimina una propuesta de ChromaDB por su ID.
+    """
+    global collection
+    if not collection:
+        initialize_chromadb()
+        
+    try:
+        collection.delete(ids=[proposal_id])
+        logger.info(f"Propuesta eliminada de RAG: {proposal_id}")
+    except Exception as e:
+        logger.error(f"Error al eliminar de RAG: {e}")
+        
+    # Borrar también el archivo JSON de examples si existe
+    json_path = os.path.join(EXAMPLES_PATH, f"{proposal_id}.json")
+    if os.path.exists(json_path):
+        try:
+            os.remove(json_path)
+            logger.info(f"Archivo JSON eliminado de examples: {json_path}")
+        except Exception as e:
+            logger.error(f"Error al eliminar archivo JSON {json_path}: {e}")
+
 def search_similar(query: str, n_results: int = 2) -> list:
     """
     Busca las propuestas más similares a la query dada.

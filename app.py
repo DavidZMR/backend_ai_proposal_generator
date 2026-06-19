@@ -257,6 +257,13 @@ def delete_proposal(proposal_id):
             # No bloqueamos el borrado de BD si falla storage
             print(f"Advertencia: No se pudieron borrar algunos archivos de {proposal_id}: {e}")
 
+        # Delete from RAG
+        try:
+            from utils.rag_setup import delete_from_rag
+            delete_from_rag(proposal_id)
+        except Exception as e:
+            print(f"Advertencia: No se pudo eliminar la propuesta del RAG {proposal_id}: {e}")
+
         res = db.table("proposals").delete().eq("id", proposal_id).execute()
         return jsonify({"status": "success", "message": "Propuesta y sus archivos eliminados correctamente."}), 200
     except Exception as e:

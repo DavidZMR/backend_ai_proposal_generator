@@ -175,7 +175,7 @@ TOOLS_SCHEMA = [
                     "hours_design": { "type": "string", "description": "Horas estimadas de Diseño UI/UX. (ej. '40')" },
                     "hours_pm": { "type": "string", "description": "Horas estimadas de Project Management. (ej. '20')" },
                     "hours_qa": { "type": "string", "description": "Horas estimadas de QA / Testing. (ej. '40')" },
-                    "total_weeks": { "type": "integer", "description": "Suma total de la duración en semanas de todos los sprints planificados en 'plan_sprints'." }
+                    "total_weeks": { "type": "string", "description": "Suma total de la duración en semanas de todos los sprints planificados en 'plan_sprints'." }
                 },
                 "required": ["hours_frontend", "hours_backend", "hours_design", "hours_pm", "hours_qa", "total_weeks"]
             }
@@ -287,6 +287,8 @@ def tool_calculate_budget(hours_frontend, hours_backend, hours_design, hours_pm,
         hours_design = int(hours_design)
         hours_pm = int(hours_pm)
         hours_qa = int(hours_qa)
+        if total_weeks is not None:
+            total_weeks = int(total_weeks)
         from utils.supabase_client import get_supabase_client
         db = get_supabase_client()
         res = db.table("settings").select("value").eq("key", "pricing_rates").execute()

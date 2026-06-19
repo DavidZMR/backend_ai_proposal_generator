@@ -34,7 +34,7 @@ def append_timeline_event(proposal_id: str, title: str, description: str):
     except Exception as e:
         logger.error(f"Error guardando timeline event: {e}")
 
-def append_decision_log(proposal_id: str, iteration: int, log_type: str, tool_name: str = "", args_summary: str = "", result_summary: str = "", decision: str = "", tokens: int = 0):
+def append_decision_log(proposal_id: str, iteration: int, log_type: str, tool_name: str = "", args_summary: str = "", result_summary: str = "", decision: str = "", tokens: int = 0, whisper_tokens: int = 0):
     """Añade un evento de trazabilidad estructurada (Agent Memory)."""
     try:
         db = get_supabase_client()
@@ -49,7 +49,8 @@ def append_decision_log(proposal_id: str, iteration: int, log_type: str, tool_na
                 "args_summary": args_summary,
                 "result_summary": result_summary,
                 "decision": decision,
-                "tokens": tokens
+                "tokens": tokens,
+                "whisper_tokens": whisper_tokens
             })
             db.table("proposals").update({"agent_decision_log": logs}).eq("id", proposal_id).execute()
     except Exception as e:
@@ -79,6 +80,11 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
             db = get_supabase_client()
             template = db.table("templates").select("*").eq("id", template_id).execute().data[0]
             sections_to_generate = template.get("sections", SECTIONS_LIST)
+            if "metodologia" not in sections_to_generate:
+                try:
+                    sections_to_generate.insert(3, "metodologia")
+                except Exception:
+                    sections_to_generate.append("metodologia")
             
             # Increment usage count
             db.table("templates").update({"usage_count": template.get("usage_count", 0) + 1}).eq("id", template_id).execute()
@@ -111,7 +117,7 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
     user_message += f"Las secciones que debes generar son {len(sections_to_generate)}: {', '.join(sections_to_generate)}.\n\n"
     user_message += "IMPORTANTE: Tu PRIMER paso debe ser usar la herramienta 'save_metadata' para estimar el monto, duración y tipo de proyecto basado en el contexto.\n"
     user_message += "Después de save_metadata, DEBES llamar a 'search_proposal_examples' con el tipo de proyecto detectado. NO redactes ninguna sección sin antes haber consultado el histórico.\n"
-    user_message += f"Luego, redacta CADA UNA de las {len(sections_to_generate)} secciones usando 'submit_section_content'. Al final, llama a 'assemble_and_export'."
+    user_message += f"Luego, redacta CADA UNA de las {len(sections_to_generate)} secciones usando 'submit_section_content', proveyendo obligatoriamente los parámetros 'section_name' y 'content'. Al final, llama a 'assemble_and_export'."
     
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -182,25 +188,27 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                             if lines:
                                 first_line_clean = lines[0].replace("#", "").replace("*", "").strip().lower()
                                 
+                                # Quitar acentos para hacer la comparación más tolerante
+                                def remove_accents(text):
+                                    return text.replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+                                
+                                first_line_clean_no_accents = remove_accents(first_line_clean)
+                                
                                 # Mapeo exacto de los nombres de sección a español
                                 section_titles_map = {
                                     "resumen_ejecutivo": "resumen ejecutivo",
                                     "alcance_funcional": "alcance funcional",
                                     "arquitectura": "arquitectura",
+                                    "metodologia": "metodologia",
                                     "plan_sprints": "plan de sprints",
                                     "supuestos": "supuestos",
                                     "exclusiones": "exclusiones",
-                                    "inversion": "inversión"
+                                    "inversion": "inversion"
                                 }
-                                expected_title = section_titles_map.get(sec_name, sec_name.replace('_', ' ')).lower()
+                                expected_title = remove_accents(section_titles_map.get(sec_name, sec_name.replace('_', ' ')).lower())
                                 
-                                # Quitar el acento en inversion para la comparación por si acaso
-                                if "inversion" in expected_title or "inversión" in expected_title:
-                                    first_line_clean = first_line_clean.replace("ó", "o")
-                                    expected_title = expected_title.replace("ó", "o")
-                                    
                                 # Si la primera línea contiene el nombre de la sección y es corta (es un título)
-                                if expected_title in first_line_clean and len(first_line_clean) < len(expected_title) + 15:
+                                if expected_title in first_line_clean_no_accents and len(first_line_clean) < len(expected_title) + 15:
                                     sec_content = "\n".join(lines[1:]).strip()
                             
                             generated_sections[sec_name] = sec_content
@@ -259,10 +267,15 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                         if tool_name == "calculate_budget":
                             tool_args["proposal_id"] = proposal_id
                         result_data = execute_tool(tool_name, tool_args)
+                        
+                        whisper_tokens_used = 0
+                        if tool_name == "transcribe_audio":
+                            whisper_tokens_used = len(str(result_data)) // 4
+                            
                         append_decision_log(
                             proposal_id, iterations, "tool_call", tool_name, 
                             str(tool_args)[:100] + "...", str(result_data)[:200] + "...", 
-                            f"Tool {tool_name} ejecutada exitosamente.", tokens_used
+                            f"Tool {tool_name} ejecutada exitosamente.", tokens_used, whisper_tokens_used
                         )
                     except Exception as e:
                         result_data = f"Error interno al ejecutar {tool_name}: {e}"
@@ -295,12 +308,7 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                                     "details": project_type
                                 })
                                 
-                            if not historic_data:
-                                historic_data = [{
-                                    "title": f"Búsqueda: {topic}",
-                                    "match": 90,
-                                    "details": "Contexto extraído de ChromaDB."
-                                }]
+                            # Se eliminó el dummy data para evitar confusión en la UI si el RAG está vacío
                             
                             db.table("proposals").update({
                                 "reference_proposals": historic_data,
