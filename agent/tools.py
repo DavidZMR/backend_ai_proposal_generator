@@ -192,8 +192,8 @@ def tool_extract_document_text(file_path: str) -> str:
     try:
         doc_text = extract_text_from_file(file_path)
         # TRUNCATE to avoid hitting Groq's 15k TPM limit when 4+ docs are uploaded
-        if len(doc_text) > 4500:
-            doc_text = doc_text[:4500] + "\n...[RESTO DEL DOCUMENTO TRUNCADO POR LÍMITE DE TOKENS. INFIERE EL RESTO.]"
+        if len(doc_text) > 2500:
+            doc_text = doc_text[:2500] + "\n...[DOCUMENTO TRUNCADO. INFIERE EL RESTO CON EL CONTEXTO DISPONIBLE.]"
         return doc_text
     except Exception as e:
         return f"Error al leer el documento: {e}"
@@ -215,9 +215,9 @@ def tool_search_proposal_examples(topic: str, num_results: int = 1) -> str:
             meta = res.get("metadata", {})
             cliente = meta.get("cliente", "Desconocido")
             doc = res.get("document", "")
-            # TRUNCATE to avoid hitting Groq's 6000 TPM limit
-            if len(doc) > 4500:
-                doc = doc[:4500] + "\n...[TRUNCADO POR LÍMITE DE TOKENS]"
+            # TRUNCATE to avoid hitting Groq's TPM limit
+            if len(doc) > 2500:
+                doc = doc[:2500] + "\n...[TRUNCADO POR LÍMITE DE TOKENS]"
             output.append(f"--- EJEMPLO {i+1}: Cliente {cliente} ---\n{doc}\n")
             
         return "\n".join(output)

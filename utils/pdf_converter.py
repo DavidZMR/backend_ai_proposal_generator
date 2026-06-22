@@ -201,9 +201,24 @@ def convert_sections_to_pdf(sections: dict, prospect_name: str, output_path: str
                 else:
                     flush_table()
                     if line.startswith("- ") or line.startswith("* ") or line.startswith("• "):
-                        # Eliminar posibles asteriscos residuales de negritas mal formateadas en viñetas
-                        clean_text = line[2:].strip().replace('**', '')
-                        story.append(Paragraph(f"• {clean_text}", bullet_style))
+                        clean_line = line[2:].strip()
+                        # Detectar subtítulos bold que vienen como viñetas: "- **Texto:**" o "- **Texto:** descripción"
+                        # Estos deben renderizarse como párrafos bold, no como bullets
+                        subtitle_match = re.match(r'^\*\*(.+?):\*\*(.*)$', clean_line.replace('<b>', '**').replace('</b>', '**'))
+                        # Also check the original (pre-HTML-converted) pattern
+                        subtitle_match_html = re.match(r'^<b>(.+?):</b>(.*)$', clean_line)
+                        if subtitle_match_html:
+                            subtitle_text = subtitle_match_html.group(1).strip()
+                            rest_text = subtitle_match_html.group(2).strip()
+                            story.append(Paragraph(f"<b>{subtitle_text}:</b> {rest_text}", normal_style))
+                        elif subtitle_match:
+                            subtitle_text = subtitle_match.group(1).strip()
+                            rest_text = subtitle_match.group(2).strip()
+                            story.append(Paragraph(f"<b>{subtitle_text}:</b> {rest_text}", normal_style))
+                        else:
+                            # Eliminar posibles asteriscos residuales de negritas mal formateadas en viñetas
+                            clean_text = clean_line.replace('**', '')
+                            story.append(Paragraph(f"• {clean_text}", bullet_style))
                     elif line.startswith("### "):
                         story.append(Paragraph(line[4:].strip(), subheading_style))
                     elif line.startswith("## "):

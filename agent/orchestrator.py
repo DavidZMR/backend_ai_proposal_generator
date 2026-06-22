@@ -7,6 +7,8 @@ de secciones y coordina la subida final a Supabase.
 
 import os
 import json
+import re
+import time
 import logging
 from datetime import datetime
 from typing import Dict, Any
@@ -17,6 +19,127 @@ from agent.tools import TOOLS_SCHEMA, execute_tool
 from utils.supabase_client import update_proposal_status, upload_file, get_supabase_client
 
 logger = logging.getLogger(__name__)
+
+# ==========================================
+# HELPERS
+# ==========================================
+
+def _call_groq_with_retry(client, messages, tools_schema, max_tokens, max_retries=3):
+    """Llama a Groq con retry silencioso en caso de rate limit (429).
+    Solo falla visiblemente después de agotar los 3 intentos."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
+                messages=messages,
+                tools=tools_schema,
+                tool_choice="auto",
+                max_tokens=max_tokens
+            )
+            return response
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "rate_limit" in error_str.lower():
+                # Extraer tiempo de espera sugerido del error
+                wait_time = 15  # default
+                wait_match = re.search(r'try again in ([\d.]+)s', error_str, re.IGNORECASE)
+                if wait_match:
+                    wait_time = float(wait_match.group(1)) + 2  # +2s de margen
+                
+                if attempt < max_retries:
+                    logger.warning(f"Rate limit alcanzado (intento {attempt}/{max_retries}). Esperando {wait_time:.1f}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Rate limit agotó {max_retries} reintentos.")
+                    raise
+            else:
+                raise
+
+def _compress_messages(messages, keep_last_n=6):
+    """Comprime el historial de mensajes para reducir tokens.
+    Mantiene: system prompt + primer user message + últimos N mensajes.
+    Los mensajes intermedios de tool results largos se resumen."""
+    if len(messages) <= keep_last_n + 2:
+        return messages
+    
+    # Siempre mantener system (0) y primer user message (1)
+    compressed = [messages[0], messages[1]]
+    
+    # De los mensajes intermedios, solo mantener un resumen compacto
+    middle_messages = messages[2:-keep_last_n]
+    for msg in middle_messages:
+        if isinstance(msg, dict) and msg.get("role") == "tool":
+            content = msg.get("content", "")
+            if len(content) > 200:
+                msg = dict(msg)  # copia para no mutar el original
+                msg["content"] = content[:150] + "...[TRUNCADO]"
+        # Los mensajes assistant con tool_calls se mantienen pero podrían comprimirse
+        compressed.append(msg)
+    
+    # Mantener los últimos N mensajes intactos (contexto reciente)
+    compressed.extend(messages[-keep_last_n:])
+    return compressed
+
+def _split_exclusiones_from_supuestos(content):
+    """Detecta si el contenido de 'supuestos' incluye exclusiones mezcladas.
+    Retorna (supuestos_limpio, exclusiones_extraidas) o (content, None) si no hay mezcla."""
+    # Patrones que indican el inicio de exclusiones dentro de supuestos
+    patterns = [
+        r'\n\s*\*\*\s*[Ee]xclusiones\s*:?\s*\*\*',   # **Exclusiones:** o **Exclusiones**
+        r'\n\s*###?\s*[Ee]xclusiones',                 # ## Exclusiones o ### Exclusiones
+        r'\n\s*[Ee]xclusiones\s*:',                     # Exclusiones:
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, content)
+        if match:
+            split_pos = match.start()
+            supuestos_clean = content[:split_pos].strip()
+            exclusiones_raw = content[match.end():].strip()
+            
+            # Limpiar el encabezado residual de exclusiones
+            exclusiones_raw = re.sub(r'^\s*:?\s*', '', exclusiones_raw).strip()
+            
+            if exclusiones_raw:
+                logger.warning(f"POST-PROCESSING: Se detectaron exclusiones mezcladas dentro de supuestos. Separando automáticamente.")
+                return supuestos_clean, exclusiones_raw
+    
+    return content, None
+
+def _normalize_markdown_content(content):
+    """Normalizador robusto de Markdown generado por el LLM.
+    Corrige todos los problemas comunes de formato en una sola pasada."""
+    
+    # Paso 1: Separar subtítulos bold que aparecen inline después de texto
+    # "texto anterior. **Entregables:**" → "texto anterior.\n\n**Entregables:**"
+    # "texto anterior. **Pago:** más texto" → "texto anterior.\n\n**Pago:** más texto"
+    content = re.sub(r'([.!?])\s+(\*\*[^*]+?:\*\*)', r'\1\n\n\2', content)
+    
+    # Paso 2: Separar múltiples definiciones bold concatenadas en un solo párrafo
+    # "**PM:** desc del rol. **UX:** desc." → cada uno en su propia línea
+    content = re.sub(r'(\*\*[^*]+?:\*\*[^*\n]+?[.!?])\s+(\*\*[^*]+?:\*\*)', r'\1\n\n\2', content)
+    # Repetir una vez más por si hay 3+ definiciones seguidas
+    content = re.sub(r'(\*\*[^*]+?:\*\*[^*\n]+?[.!?])\s+(\*\*[^*]+?:\*\*)', r'\1\n\n\2', content)
+    
+    # Paso 3: Números huérfanos (ej. "4.\n\n**Pruebas:**" → quitar el número suelto)
+    content = re.sub(r'^\d+\.\s*$', '', content, flags=re.MULTILINE)
+    
+    # Paso 4: Viñetas que son subtítulos bold → quitar la viñeta
+    # "- **Entregables:**" → "**Entregables:**"
+    # "* **Criterios de Aceptación:**" → "**Criterios de Aceptación:**"
+    content = re.sub(r'^[-*•]\s+(\*\*[^*]+?:\*\*)', r'\1', content, flags=re.MULTILINE)
+    
+    # Paso 5: Asegurar línea en blanco ANTES de subtítulos bold para mejor rendering
+    # (solo si no hay ya una línea en blanco)
+    content = re.sub(r'([^\n])\n(\*\*[^*]+?:\*\*)', r'\1\n\n\2', content)
+    
+    # Paso 6: Asegurar línea en blanco ANTES de encabezados markdown (###)
+    content = re.sub(r'([^\n])\n(#{1,3}\s)', r'\1\n\n\2', content)
+    
+    # Paso 7: Limpiar líneas en blanco excesivas (más de 2 seguidas)
+    content = re.sub(r'\n{3,}', '\n\n', content)
+    
+    return content.strip()
 
 def append_timeline_event(proposal_id: str, title: str, description: str):
     """Añade un evento a la línea de tiempo de la IA."""
@@ -138,12 +261,15 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
             iterations += 1
             logger.info(f"Agent Loop Iteration {iterations}")
             
-            response = client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct", 
-                messages=messages,
-                tools=TOOLS_SCHEMA,
-                tool_choice="auto",
-                max_tokens=1500
+            # Comprimir historial para mantener tokens bajo control
+            messages = _compress_messages(messages, keep_last_n=6)
+            
+            # max_tokens dinámico: más alto solo para secciones largas
+            dynamic_max_tokens = 4000
+            
+            response = _call_groq_with_retry(
+                client, messages, TOOLS_SCHEMA, 
+                max_tokens=dynamic_max_tokens
             )
             
             tokens_in_iteration = response.usage.total_tokens if hasattr(response, 'usage') and response.usage else 0
@@ -183,7 +309,7 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                         sec_name = tool_args.get("section_name")
                         sec_content = tool_args.get("content")
                         if sec_name and sec_content:
-                            # --- POST-PROCESSING: Eliminar título redundante ---
+                            # --- POST-PROCESSING 1: Eliminar título redundante ---
                             lines = sec_content.strip().split("\n")
                             if lines:
                                 first_line_clean = lines[0].replace("#", "").replace("*", "").strip().lower()
@@ -210,6 +336,19 @@ def run_agent(proposal_id: str, prospect_name: str, audio_paths: list = None, tr
                                 # Si la primera línea contiene el nombre de la sección y es corta (es un título)
                                 if expected_title in first_line_clean_no_accents and len(first_line_clean) < len(expected_title) + 15:
                                     sec_content = "\n".join(lines[1:]).strip()
+                            
+                            # --- POST-PROCESSING 2: Normalizar formato Markdown ---
+                            sec_content = _normalize_markdown_content(sec_content)
+                            
+                            # --- POST-PROCESSING 3: Separar exclusiones si están mezcladas en supuestos ---
+                            if sec_name == "supuestos":
+                                sec_content, exclusiones_extraidas = _split_exclusiones_from_supuestos(sec_content)
+                                if exclusiones_extraidas:
+                                    exclusiones_extraidas = _normalize_markdown_content(exclusiones_extraidas)
+                                    generated_sections["exclusiones"] = exclusiones_extraidas
+                                    if "exclusiones" not in sections_completed:
+                                        sections_completed.append("exclusiones")
+                                    logger.info("Exclusiones auto-separadas de supuestos y guardadas.")
                             
                             generated_sections[sec_name] = sec_content
                             if sec_name not in sections_completed:
@@ -463,6 +602,9 @@ FEEDBACK DEL COMERCIAL:
         
         new_content = response.choices[0].message.content
         tokens = response.usage.total_tokens if hasattr(response, 'usage') and response.usage else 0
+        
+        # 2.5 Normalizar formato Markdown (misma lógica que en generación inicial)
+        new_content = _normalize_markdown_content(new_content)
         
         # 3. Update section
         sections_content[section_name] = new_content

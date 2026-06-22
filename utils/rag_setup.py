@@ -1,45 +1,41 @@
 """
-rag_setup.py — Búsqueda en base de datos vectorial mediante Supabase y HuggingFace.
+rag_setup.py — Búsqueda en base de datos vectorial mediante Supabase y Sentence-Transformers locales.
 
 Este módulo permite indexar propuestas comerciales pasadas usando embeddings generados
-mediante la API pública de HuggingFace y almacenados en Supabase (pgvector).
+mediante la librería sentence-transformers (localmente) y almacenados en Supabase (pgvector),
+evitando por completo el uso y memoria de ChromaDB.
 """
 
 import os
 import json
 import logging
-import requests
+from sentence_transformers import SentenceTransformer
 from utils.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
 EXAMPLES_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "examples")
 
-# Usamos la API de Inferencia gratuita de Hugging Face
-HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+# Inicialización perezosa (lazy load) del modelo para no bloquear el inicio ni consumir memoria hasta que se necesite
+_model = None
+
+def get_model():
+    """Carga el modelo de embeddings en memoria solo cuando se requiere."""
+    global _model
+    if _model is None:
+        logger.info("Cargando modelo sentence-transformers en memoria...")
+        _model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _model
 
 def get_embedding(text: str) -> list:
-    """Obtiene el embedding de un texto usando Hugging Face."""
-    headers = {}
-    hf_token = os.environ.get("HF_TOKEN")
-    if hf_token:
-        headers["Authorization"] = f"Bearer {hf_token}"
-        
+    """Obtiene el embedding numérico de un texto usando el modelo local."""
     try:
-        response = requests.post(HF_API_URL, headers=headers, json={"inputs": [text]})
-        response.raise_for_status()
-        
-        # La respuesta es típicamente una lista de listas (un vector por texto)
-        result = response.json()
-        if isinstance(result, list) and len(result) > 0:
-            if isinstance(result[0], list):
-                return result[0]
-            return result
-        raise ValueError(f"Respuesta inesperada de HF: {result}")
+        model = get_model()
+        # encode retorna un numpy array, lo convertimos a lista plana
+        vector = model.encode(text).tolist()
+        return vector
     except Exception as e:
-        logger.error(f"Error obteniendo embedding de HuggingFace: {e}")
-        # Retornamos un vector de 384 ceros como fallback seguro para evitar crashear, 
-        # aunque no servirá para buscar.
+        logger.error(f"Error generando embedding localmente: {e}")
         return [0.0] * 384
 
 def index_proposal(file_path: str, proposal_id: str):
@@ -60,7 +56,12 @@ def index_proposal(file_path: str, proposal_id: str):
         if "secciones" in data:
             for sec_name, sec_content in data["secciones"].items():
                 if isinstance(sec_content, str):
-                    content_parts.append(f"[{sec_name.upper()}]\n{sec_content}")
+                    # Solo guardar un extracto compacto de cada sección (máx 300 chars)
+                    # para evitar documentos enormes que inflan el consumo de tokens al buscar
+                    trimmed = sec_content[:300].strip()
+                    if len(sec_content) > 300:
+                        trimmed += "..."
+                    content_parts.append(f"[{sec_name.upper()}]\n{trimmed}")
                 
         full_text = "\n".join(content_parts)
         metadata = {

@@ -153,8 +153,21 @@ def build_docx(sections: dict, prospect_name: str, output_path: str) -> str:
                 else:
                     in_table = False
                     if line.startswith("- ") or line.startswith("* ") or line.startswith("• "):
-                        clean_line = line[2:].strip().replace('**', '')
-                        p = doc.add_paragraph(clean_line, style='List Bullet')
+                        clean_line = line[2:].strip()
+                        # Detectar subtítulos bold que vienen como viñetas: "- **Texto:**" o "- **Texto:** descripción"
+                        # Estos deben renderizarse como párrafos bold, no como bullets
+                        import re
+                        subtitle_match = re.match(r'^\*\*(.+?):\*\*(.*)$', clean_line)
+                        if subtitle_match:
+                            subtitle_text = subtitle_match.group(1).strip()
+                            rest_text = subtitle_match.group(2).strip()
+                            p = doc.add_paragraph()
+                            run = p.add_run(f"{subtitle_text}:")
+                            run.bold = True
+                            if rest_text:
+                                p.add_run(f" {rest_text}")
+                        else:
+                            p = doc.add_paragraph(clean_line.replace('**', ''), style='List Bullet')
                     elif line.startswith("### "):
                         clean_line = line[4:].strip()
                         p = doc.add_heading(clean_line, level=3)
