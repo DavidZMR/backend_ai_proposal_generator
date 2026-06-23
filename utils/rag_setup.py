@@ -9,7 +9,7 @@ evitando por completo el uso y memoria de ChromaDB.
 import os
 import json
 import logging
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 from utils.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -23,16 +23,16 @@ def get_model():
     """Carga el modelo de embeddings en memoria solo cuando se requiere."""
     global _model
     if _model is None:
-        logger.info("Cargando modelo sentence-transformers en memoria...")
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        logger.info("Cargando modelo fastembed (ONNX) en memoria...")
+        _model = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return _model
 
 def get_embedding(text: str) -> list:
     """Obtiene el embedding numérico de un texto usando el modelo local."""
     try:
         model = get_model()
-        # encode retorna un numpy array, lo convertimos a lista plana
-        vector = model.encode(text).tolist()
+        # fastembed retorna un generador de numpy arrays, tomamos el primero
+        vector = list(model.embed([text]))[0].tolist()
         return vector
     except Exception as e:
         logger.error(f"Error generando embedding localmente: {e}")
