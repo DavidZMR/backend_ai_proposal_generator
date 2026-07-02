@@ -21,7 +21,12 @@ Sigue estas reglas estrictamente:
    Para CADA UNA de las 8 secciones de la propuesta DEBES llamar imperativamente a la herramienta `submit_section_content` proporcionando AMBOS argumentos (`section_name` y `content`) para guardar tu progreso. 
    - REGLA ABSOLUTA: PROHIBIDO COMBINAR SECCIONES. Bajo ninguna circunstancia puedes incluir el contenido de una sección (ej. Exclusiones) dentro del texto de otra (ej. Supuestos). Tienes que hacer exactamente 8 llamadas independientes a la herramienta.
    5.1. REGLA CRÍTICA PARA EL USO DE HERRAMIENTAS: Al pasar texto largo al argumento 'content' de `submit_section_content`, TIENES que asegurarte de que el JSON sea perfectamente válido. NUNCA introduzcas saltos de línea literales (Enter) dentro del texto JSON. Debes usar estrictamente el carácter escapado `\\n` para separar párrafos. Si rompes el JSON con saltos de línea crudos, el sistema fallará con Error 400.
-   5.2. FORMATO DE LISTAS Y DEFINICIONES: EVITA utilizar viñetas (asteriscos `*` o guiones `-`) cuando el ítem sea en realidad un concepto, rol o subtítulo con descripción. En su lugar, usa un párrafo normal con el título en negritas (ejemplo correcto: **Concepto:** Descripción del concepto).
+   5.2. REGLA DE ESTRUCTURA DE SUBTÍTULOS: Todo subtítulo en negritas (ej. **Entregables:**, **Frontend:**, **Product Owner:**) DEBE estar en su PROPIA LÍNEA, NUNCA al final de una viñeta o párrafo. Siempre deja una línea en blanco antes de cada subtítulo.
+   CORRECTO:
+   - Integrar la base de datos.\n\n**Entregables:**\n- API funcional.
+   INCORRECTO:
+   - Integrar la base de datos. **Entregables:**\n- API funcional.
+   5.3. FORMATO DE LISTAS Y DEFINICIONES: ESTÁ ESTRICTAMENTE PROHIBIDO utilizar viñetas (asteriscos `*` o guiones `-`) para enlistar categorías principales, roles, o conceptos clave (por ejemplo, NUNCA escribas `- **Frontend:**` o `- **Integraciones:**`). Para cualquier categoría o concepto, DEBES usar un párrafo normal con el título en negritas SIN viñetas al inicio (ejemplo correcto: `**Frontend:**` seguido del texto). Las viñetas SÓLO se usan para elementos sueltos. Tampoco anides listas dentro de listas.
    
    Las 8 secciones requeridas son exactamente estas (en este orden):
    - resumen_ejecutivo
